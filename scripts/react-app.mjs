@@ -65,6 +65,16 @@ async function syncStaticFiles() {
   }
 }
 
+async function applyAssetCacheBust() {
+  const version = Date.now().toString();
+  const distIndexFile = path.join(distDir, 'index.html');
+  const html = await fs.readFile(distIndexFile, 'utf8');
+  const nextHtml = html
+    .replace(/\/assets\/main\.css(?:\?v=[^"']*)?/g, `/assets/main.css?v=${version}`)
+    .replace(/\/assets\/main\.js(?:\?v=[^"']*)?/g, `/assets/main.js?v=${version}`);
+  await fs.writeFile(distIndexFile, nextHtml);
+}
+
 function buildOptions({ watch = false } = {}) {
   return {
     entryPoints: [entryFile],
@@ -85,6 +95,7 @@ async function runBuild() {
   await fs.rm(distDir, { recursive: true, force: true });
   await ensureDir(assetsDir);
   await syncStaticFiles();
+  await applyAssetCacheBust();
   await build(buildOptions());
 }
 
