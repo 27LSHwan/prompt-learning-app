@@ -1,5 +1,3 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:8000';
-
 let runtimeEnv: Record<string, string> = {};
 let loaded = false;
 
@@ -34,5 +32,9 @@ export async function loadRuntimeEnv(): Promise<void> {
 }
 
 export function getApiBaseUrl(): string {
-  return runtimeEnv.API_BASE_URL || DEFAULT_API_BASE_URL;
+  const apiBaseUrl = runtimeEnv.API_BASE_URL?.trim();
+  if (!apiBaseUrl) {
+    throw new Error('API_BASE_URL is missing. Check the runtime /.env file.');
+  }
+  return apiBaseUrl.replace(/\/+$/, '');
 }

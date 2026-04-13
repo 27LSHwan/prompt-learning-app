@@ -8,6 +8,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(cfg => {
+  cfg.baseURL = `${getApiBaseUrl()}/api/v1`;
   const token = getToken();
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
   return cfg;

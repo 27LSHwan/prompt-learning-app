@@ -8,6 +8,7 @@ const api = axios.create({
 
 // Attach JWT token to every request
 api.interceptors.request.use((config) => {
+  config.baseURL = `${getApiBaseUrl()}/api/v1`;
   const token = localStorage.getItem('admin_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
