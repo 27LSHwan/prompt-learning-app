@@ -1,0 +1,43 @@
+{
+  "student_id": "test_student_001",
+  "existing_submission_id": "00000000-0000-0000-0000-000000000001",
+
+  "submission_create": {
+    "student_id": "test_student_001",
+    "course_id": "COURSE_PYTHON_101",
+    "content": "오늘 파이썬 함수를 배웠습니다. 재귀 함수 개념이 어렵지만 열심히 공부하겠습니다.",
+    "submission_type": "reflection"
+  },
+
+  "submission_create_high_risk": {
+    "student_id": "test_student_high_risk",
+    "course_id": "COURSE_PYTHON_101",
+    "content": "수업 내용을 전혀 이해하지 못하겠습니다. 그냥 포기하고 싶습니다. 아무것도 모르겠고 너무 힘듭니다.",
+    "submission_type": "reflection"
+  },
+
+  "intervention_create": {
+    "student_id": "test_student_001",
+    "type": "email",
+    "message": "test_student_001님, 최근 학습 패턴을 모니터링한 결과 도움이 필요한 것으로 판단됩니다. 편하게 연락주세요."
+  },
+
+  "risk_response_example": {
+    "student_id": "test_student_001",
+    "score": 72.5,
+    "level": "high",
+    "factors": {
+      "engagement": 20.0,
+      "performance": 24.5,
+      "sentiment": 28.0
+    },
+    "calculated_at": "2026-04-07T09:00:00Z"
+  },
+
+  "level_score_examples": {
+    "low": 15.0,
+    "medium": 38.5,
+    "high": 63.0,
+    "critical": 88.5
+  }
+}

@@ -1,0 +1,63 @@
+# ──────────────────────────────────────────────────────────────
+# 서비스 포트 구성
+#   backend    : 8000  (FastAPI)
+#   student-web: 3000  (Nginx → React)
+#   admin-web  : 3001  (Nginx → React)
+# ──────────────────────────────────────────────────────────────
+
+services:
+  # ── 백엔드 ─────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: prompt_edu_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "sqlite+aiosqlite:////data/prod.db"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+      SECRET_KEY: "${SECRET_KEY}"
+      DEBUG: "false"
+      ALLOWED_ORIGINS: '["http://${SERVER_IP}:3000","http://${SERVER_IP}:3001","http://localhost:3000","http://localhost:3001"]'
+    volumes:
+      - db_data:/data        # SQLite DB 영속화
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── 학생 프론트엔드 ─────────────────────────────────────────
+  student-web:
+    build:
+      context: .
+      dockerfile: apps/student-web/Dockerfile
+    container_name: prompt_edu_student
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      API_BASE_URL: "http://${SERVER_IP}:8000"
+    depends_on:
+      - backend
+
+  # ── 관리자 프론트엔드 ───────────────────────────────────────
+  admin-web:
+    build:
+      context: .
+      dockerfile: apps/admin-web/Dockerfile
+    container_name: prompt_edu_admin
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    environment:
+      API_BASE_URL: "http://${SERVER_IP}:8000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+    driver: local

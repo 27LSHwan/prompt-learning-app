@@ -1,0 +1,186 @@
+version: "2.0"
+project: "AI 학습 낙오 예측 시스템 (final_ai_dropout_spec)"
+
+checks:
+  structure:
+    enabled: true
+    module: structure_checks.check_files
+    description: "필수 파일 존재 여부 검증"
+    fail_fast: true
+
+  contract_api:
+    enabled: true
+    module: contract_checks.check_api
+    description: "API 엔드포인트 계약 검증"
+    requires_server: true
+    server_url: "http://localhost:8000"
+
+  contract_requirements:
+    enabled: true
+    module: contract_checks.check_requirements
+    description: "requirements.txt 패키지 선언 및 import 가능 여부 검증"
+
+  contract_db:
+    enabled: true
+    module: contract_checks.check_db
+    description: "DB 스키마 계약 검증"
+
+  contract_import_style:
+    enabled: true
+    module: contract_checks.check_import_style
+    description: "함수/블록 내부 import 문 검출 (모든 import는 파일 최상단에 위치해야 함)"
+
+  contract_login_form:
+    enabled: true
+    module: contract_checks.check_login_form
+    description: "LoginPage 로그인 요청이 JSON body + email 필드를 사용하는지 검증 (URLSearchParams/form-urlencoded/username 필드 금지)"
+
+  contract_responsive_layout:
+    enabled: true
+    module: contract_checks.check_responsive_layout
+    description: "학생/관리자 주요 화면이 데스크톱/태블릿/모바일 반응형 레이아웃 규칙을 포함하는지 검증"
+
+  contract_feature_extensions:
+    enabled: true
+    module: contract_checks.check_feature_extensions
+    description: "학생/관리자 확장 기능(약점 리포트, 문제 큐, 패턴 분석, 타임라인 등) 구현 여부 검증"
+
+  contract_security:
+    enabled: true
+    module: contract_checks.check_security
+    description: "보안 필수 요건 7개 검증 (bcrypt, JWT 인증 의존성, rate limiting, student_id 쿼리 파라미터 금지, .env.example, 시크릿 하드코딩 금지, refresh 엔드포인트)"
+
+  integration:
+    enabled: true
+    module: integration_checks.check_flow
+    description: "scoring / decision 파이프라인 검증"
+
+  e2e_student:
+    enabled: true
+    module: e2e_checks.check_student_flow
+    description: "학생 흐름 E2E"
+    requires_server: true
+
+  e2e_admin:
+    enabled: true
+    module: e2e_checks.check_admin_flow
+    description: "관리자 흐름 E2E"
+    requires_server: true
+
+required_files:
+  backend:
+    - apps/backend/app/main.py
+    - apps/backend/app/config.py
+    - apps/backend/app/database.py
+    - apps/backend/app/models/user.py
+    - apps/backend/app/models/problem.py
+    - apps/backend/app/models/submission.py
+    - apps/backend/app/models/learning_metrics.py
+    - apps/backend/app/models/risk_score.py
+    - apps/backend/app/models/intervention.py
+    - apps/backend/app/schemas/auth.py
+    - apps/backend/app/schemas/student.py
+    - apps/backend/app/schemas/admin.py
+    - apps/backend/app/schemas/risk.py
+    - apps/backend/app/services/auth_service.py
+    - apps/backend/app/services/submission_service.py
+    - apps/backend/app/services/risk_service.py
+    - apps/backend/app/services/intervention_service.py
+    - apps/backend/app/api/routes/auth.py
+    - apps/backend/app/api/routes/student.py
+    - apps/backend/app/api/routes/admin.py
+    - apps/backend/requirements.txt
+
+  student_web:
+    # §12.1 학생용 프론트 — 8 페이지 + 캐릭터 마스코트 시스템
+    - apps/student-web/src/App.tsx
+    - apps/student-web/src/main.tsx
+    - apps/student-web/src/lib/api.ts
+    - apps/student-web/src/lib/auth.ts
+    - apps/student-web/src/types/index.ts
+    - apps/student-web/src/components/Layout.tsx
+    - apps/student-web/src/components/RiskBadge.tsx
+    - apps/student-web/src/components/RiskGauge.tsx
+    - apps/student-web/src/components/Character.tsx
+    - apps/student-web/src/components/CharacterMessage.tsx
+    - apps/student-web/src/components/NotificationModal.tsx
+    - apps/student-web/src/hooks/useNotifications.tsx
+    - apps/student-web/src/pages/LoginPage.tsx
+    - apps/student-web/src/pages/SignupPage.tsx
+    - apps/student-web/src/pages/DashboardPage.tsx
+    - apps/student-web/src/pages/ProblemsPage.tsx
+    - apps/student-web/src/pages/ProblemWorkPage.tsx
+    - apps/student-web/src/pages/SubmissionResultPage.tsx
+    - apps/student-web/src/pages/RiskPage.tsx
+    - apps/student-web/src/pages/HistoryPage.tsx
+    - apps/student-web/src/pages/RecommendPage.tsx
+    - apps/student-web/package.json
+
+  admin_web:
+    # §12.2 관리자용 프론트 — 5 페이지
+    - apps/admin-web/src/App.tsx
+    - apps/admin-web/src/main.tsx
+    - apps/admin-web/src/lib/api.ts
+    - apps/admin-web/src/types/index.ts
+    - apps/admin-web/src/components/Layout.tsx
+    - apps/admin-web/src/components/RiskDistributionChart.tsx
+    - apps/admin-web/src/pages/LoginPage.tsx
+    - apps/admin-web/src/pages/DashboardPage.tsx
+    - apps/admin-web/src/pages/StudentsPage.tsx
+    - apps/admin-web/src/pages/StudentDetailPage.tsx
+    - apps/admin-web/src/pages/InterventionPage.tsx
+    - apps/admin-web/package.json
+
+  packages:
+    - packages/shared/__init__.py
+    - packages/shared/types.py
+    - packages/shared/utils.py
+    - packages/llm_analysis/__init__.py
+    - packages/llm_analysis/analyzer.py
+    - packages/llm_analysis/prompts.py
+    - packages/llm_analysis/schemas.py
+    - packages/scoring/__init__.py
+    - packages/scoring/engine.py
+    - packages/scoring/weights.py
+    - packages/scoring/schemas.py
+    - packages/decision/__init__.py
+    - packages/decision/engine.py
+    - packages/decision/types.py
+    - packages/decision/schemas.py
+
+scoring_rules:
+  thinking_risk_formula: "100 - weighted_sum(thinking_scores)"
+  base_risk_weights:
+    performance: 0.30
+    progress: 0.25
+    engagement: 0.20
+    process: 0.15
+    thinking: 0.10
+  event_bonuses:
+    sudden_score_drop: 15
+    sudden_activity_drop: 15
+    repeated_error: 10
+    no_improvement: 10
+    dependency: 15
+    multi_signal: 20
+  total_risk_formula: "min(100, base_risk + event_bonus)"
+
+risk_stages:
+  - range: [0, 19]
+    stage: "안정"
+  - range: [20, 39]
+    stage: "경미"
+  - range: [40, 59]
+    stage: "주의"
+  - range: [60, 79]
+    stage: "고위험"
+  - range: [80, 100]
+    stage: "심각"
+
+dropout_types:
+  - cognitive
+  - motivational
+  - strategic
+  - sudden
+  - dependency
+  - compound
