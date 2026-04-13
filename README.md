@@ -2,6 +2,33 @@
 
 프롬프트 교육용 학생/관리자 웹 서비스입니다. 학생은 문제 풀이, LLM 기반 기준표 평가, 프롬이 코칭, 마이크 개념 설명 확인, 맞춤 학습 추천을 사용하고, 관리자는 학생 위험도, 제출 이력, 문제 추천, 개입 현황, 프롬이 코칭 품질 리뷰 큐를 운영합니다.
 
+## 접속 URL
+
+```text
+학생 접속 URL:   http://34.47.85.162:3000/
+관리자 접속 URL: http://34.47.85.162:3001/
+```
+
+## 로그인 계정
+
+시드 데이터 기준 계정은 `apps/backend/seed.py`에서 관리합니다.
+
+```text
+[관리자]
+admin@example.com / admin1234
+professor@example.com / prof1234
+
+[학생] 비밀번호 공통: student123
+김민준: minjun@example.com (cognitive형)
+이서연: seoyeon@example.com (none형)
+박도윤: doyun@example.com (motivational형)
+최지우: jiwoo@example.com (strategic형)
+정하은: haeun@example.com (sudden형)
+강시우: siwoo@example.com (dependency형)
+윤아린: arin@example.com (compound형)
+임주원: juwon@example.com (cognitive형)
+```
+
 ## 주요 기능
 
 - 학생 포털: 문제 목록, 문제 풀이, 결과 실행, 최종 제출, 제출 이력, 위험도 분석, 맞춤 학습 추천
@@ -188,19 +215,6 @@ cd ../admin-web && npm run build
 cd ../..
 python3 harness/verification/contract_checks/check_feature_extensions.py
 python3 harness/verification/contract_checks/check_responsive_layout.py
-```
-
-## 시드 계정
-
-시드 데이터 기준 계정은 `apps/backend/seed.py`에서 관리합니다.
-
-```text
-관리자
-admin@example.com / admin1234
-professor@example.com / prof1234
-
-학생
-minjun@example.com / student123
 ```
 
 ## Git 업로드 주의
