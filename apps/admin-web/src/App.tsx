@@ -10,6 +10,7 @@ import StudentDetailPage from './pages/StudentDetailPage';
 import InterventionPage from './pages/InterventionPage';
 import InterventionsListPage from './pages/InterventionsListPage';
 import ProblemsManagePage from './pages/ProblemsManagePage';
+import PromiRuleUpdatesPage from './pages/PromiRuleUpdatesPage';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="/interventions" element={<InterventionPage />} />
               <Route path="/interventions/new" element={<InterventionPage />} />
               <Route path="/interventions-list" element={<InterventionsListPage />} />
+              <Route path="/promi-rules" element={<PromiRuleUpdatesPage />} />
               <Route path="/problems" element={<ProblemsManagePage />} />
             </Route>
 

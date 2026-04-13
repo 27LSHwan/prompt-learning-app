@@ -361,4 +361,38 @@ class PromiReviewActionResponse(BaseModel):
     ok: bool
     status: str
     intervention_id: Optional[str] = None
+    rule_update_id: Optional[str] = None
     action: str
+
+
+class PromiRuleUpdateItem(BaseModel):
+    id: str
+    promi_log_id: Optional[str] = None
+    student_id: Optional[str] = None
+    username: str
+    problem_id: Optional[str] = None
+    problem_title: str
+    original_message: str
+    caution: Optional[str] = None
+    review_note: Optional[str] = None
+    admin_message: str
+    status: Literal["pending", "reflected", "held"] = "pending"
+    resolved_note: Optional[str] = None
+    rule_patch: Optional[str] = None
+    resolved_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class PromiRuleUpdateQueueResponse(BaseModel):
+    items: list[PromiRuleUpdateItem]
+
+
+class PromiRuleUpdateResolve(BaseModel):
+    status: Literal["reflected", "held"] = "reflected"
+    note: Optional[str] = None
+    rule_patch: Optional[str] = None
+
+
+class PromiRuleUpdateResolveResponse(BaseModel):
+    ok: bool
+    status: str

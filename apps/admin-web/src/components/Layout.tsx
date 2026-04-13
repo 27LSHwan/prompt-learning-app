@@ -6,6 +6,7 @@ const NAV = [
   { to: '/dashboard',          icon: '📊', label: '대시보드' },
   { to: '/students',           icon: '👥', label: '학생 목록' },
   { to: '/interventions-list', icon: '📋', label: '개입 현황' },
+  { to: '/promi-rules',        icon: '🐶', label: '프롬이 규칙' },
   { to: '/problems',           icon: '📝', label: '문제 관리' },
 ];
 

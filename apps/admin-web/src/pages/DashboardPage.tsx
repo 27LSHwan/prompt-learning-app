@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { useToast } from '../hooks/useToast';
 import RiskDistributionChart from '../components/RiskDistributionChart';
 import type {
   DashboardResponse, RiskStage,
   DropoutTrendPoint, InterventionEffectItem, RecommendationEffectItem, ActivityLogListResponse, LearningPatternItem,
-  InterventionPriorityItem, ProblemInsightItem, PromiReviewQueueItem,
+  InterventionPriorityItem, ProblemInsightItem, PromiReviewActionResponse, PromiReviewQueueItem, PromiRuleUpdateItem,
 } from '../types';
 
 const STAGE_COLOR: Record<RiskStage, string> = {
@@ -131,6 +132,7 @@ function InterventionEffectChart({ items }: { items: InterventionEffectItem[] })
 /* ── Main Component ──────────────────────────────────────────── */
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [data, setData]         = useState<DashboardResponse | null>(null);
   const [loading, setLoading]   = useState(true);
   const [dropoutTrend, setDropoutTrend]   = useState<DropoutTrendPoint[]>([]);
@@ -141,7 +143,9 @@ export default function DashboardPage() {
   const [priorityItems, setPriorityItems] = useState<InterventionPriorityItem[]>([]);
   const [problemInsights, setProblemInsights] = useState<ProblemInsightItem[]>([]);
   const [promiReviewItems, setPromiReviewItems] = useState<PromiReviewQueueItem[]>([]);
+  const [promiRuleUpdateItems, setPromiRuleUpdateItems] = useState<PromiRuleUpdateItem[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [reviewingPromiId, setReviewingPromiId] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
     try {
@@ -157,7 +161,7 @@ export default function DashboardPage() {
   const fetchAnalytics = async () => {
     setAnalyticsLoading(true);
     try {
-      const [dropoutRes, effectRes, recommendationRes, activityRes, patternRes, priorityRes, insightRes, promiReviewRes] = await Promise.allSettled([
+      const [dropoutRes, effectRes, recommendationRes, activityRes, patternRes, priorityRes, insightRes, promiReviewRes, promiRuleUpdateRes] = await Promise.allSettled([
         api.get<{ points: DropoutTrendPoint[] }>('/admin/analytics/dropout-trend?days=30'),
         api.get<{ items: InterventionEffectItem[] }>('/admin/analytics/intervention-effect'),
         api.get<{ items: RecommendationEffectItem[] }>('/admin/analytics/recommendation-effect'),
@@ -166,6 +170,7 @@ export default function DashboardPage() {
         api.get<{ items: InterventionPriorityItem[] }>('/admin/intervention-priority-queue'),
         api.get<{ items: ProblemInsightItem[] }>('/admin/analytics/problem-insights'),
         api.get<{ items: PromiReviewQueueItem[] }>('/admin/promi-review-queue'),
+        api.get<{ items: PromiRuleUpdateItem[] }>('/admin/promi-rule-updates'),
       ]);
       if (dropoutRes.status === 'fulfilled') setDropoutTrend(dropoutRes.value.data.points ?? []);
       if (effectRes.status === 'fulfilled') setEffectItems(effectRes.value.data.items ?? []);
@@ -175,15 +180,34 @@ export default function DashboardPage() {
       if (priorityRes.status === 'fulfilled') setPriorityItems(priorityRes.value.data.items ?? []);
       if (insightRes.status === 'fulfilled') setProblemInsights(insightRes.value.data.items ?? []);
       if (promiReviewRes.status === 'fulfilled') setPromiReviewItems(promiReviewRes.value.data.items ?? []);
+      if (promiRuleUpdateRes.status === 'fulfilled') setPromiRuleUpdateItems(promiRuleUpdateRes.value.data.items ?? []);
     } catch { /* silent */ }
     finally { setAnalyticsLoading(false); }
   };
 
   const reviewPromi = async (logId: string, status: 'approved' | 'needs_prompt_update' | 'follow_up_student') => {
-    const res = await api.post<{ ok: boolean; status: string; intervention_id?: string | null; action: string }>(`/admin/promi-review-queue/${logId}/review`, { status });
-    setPromiReviewItems(prev => prev.filter(item => item.log_id !== logId));
-    if (status === 'follow_up_student' && res.data.intervention_id) {
-      navigate(`/interventions-list?detail=${encodeURIComponent(res.data.intervention_id)}`);
+    setReviewingPromiId(logId);
+    try {
+      const res = await api.post<PromiReviewActionResponse>(`/admin/promi-review-queue/${logId}/review`, { status });
+      setPromiReviewItems(prev => prev.filter(item => item.log_id !== logId));
+      if (status === 'follow_up_student' && res.data.intervention_id) {
+        showToast('학생 개입 초안이 생성되었습니다', 'success');
+        navigate(`/interventions-list?detail=${encodeURIComponent(res.data.intervention_id)}`);
+        return;
+      }
+      if (status === 'needs_prompt_update') {
+        showToast('프롬이 규칙 개선 항목으로 등록되었습니다', 'success');
+        fetchAnalytics();
+        if (res.data.rule_update_id) {
+          navigate(`/promi-rules?item=${encodeURIComponent(res.data.rule_update_id)}`);
+        }
+        return;
+      }
+      showToast('프롬이 코칭 검토가 승인되었습니다', 'success');
+    } catch {
+      showToast('프롬이 코칭 검토 처리에 실패했습니다', 'error');
+    } finally {
+      setReviewingPromiId(null);
     }
   };
 
@@ -250,7 +274,33 @@ export default function DashboardPage() {
             </div>
 
             <div className="card" style={{ padding: '20px 22px' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>프롬이 코칭 품질 리뷰 큐</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 800 }}>프롬이 코칭 품질 리뷰 큐</h3>
+                <button type="button" onClick={() => navigate('/promi-rules')} className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 12 }}>
+                  규칙 개선 요청 {promiRuleUpdateItems.length}건
+                </button>
+              </div>
+              {!analyticsLoading && promiRuleUpdateItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/promi-rules?item=${encodeURIComponent(promiRuleUpdateItems[0].id)}`)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    border: '1px solid #fed7aa',
+                    background: '#fff7ed',
+                    color: '#9a3412',
+                    borderRadius: 12,
+                    padding: '10px 12px',
+                    marginBottom: 12,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  규칙 개선 요청 {promiRuleUpdateItems.length}건이 대기 중입니다. 가장 최근 요청: {promiRuleUpdateItems[0].problem_title}
+                </button>
+              )}
               {analyticsLoading ? <div style={{ height: 120, background: '#f1f5f9', borderRadius: 8 }} /> : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {promiReviewItems.slice(0, 4).map(item => (
@@ -261,9 +311,9 @@ export default function DashboardPage() {
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.55, marginBottom: 8 }}>{item.message}</div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button type="button" onClick={() => reviewPromi(item.log_id, 'approved')} className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }}>승인</button>
-                        <button type="button" onClick={() => reviewPromi(item.log_id, 'needs_prompt_update')} className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }}>프롬이 규칙 개선</button>
-                        <button type="button" onClick={() => reviewPromi(item.log_id, 'follow_up_student')} className="btn btn-primary" style={{ padding: '5px 10px', fontSize: 11 }}>학생 개입</button>
+                        <button type="button" disabled={reviewingPromiId === item.log_id} onClick={() => reviewPromi(item.log_id, 'approved')} className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }}>{reviewingPromiId === item.log_id ? '처리 중' : '승인'}</button>
+                        <button type="button" disabled={reviewingPromiId === item.log_id} onClick={() => reviewPromi(item.log_id, 'needs_prompt_update')} className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }}>{reviewingPromiId === item.log_id ? '처리 중' : '프롬이 규칙 개선'}</button>
+                        <button type="button" disabled={reviewingPromiId === item.log_id} onClick={() => reviewPromi(item.log_id, 'follow_up_student')} className="btn btn-primary" style={{ padding: '5px 10px', fontSize: 11 }}>{reviewingPromiId === item.log_id ? '처리 중' : '학생 개입'}</button>
                       </div>
                     </div>
                   ))}

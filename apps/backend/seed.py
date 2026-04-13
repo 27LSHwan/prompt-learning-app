@@ -1188,8 +1188,9 @@ async def seed(reset: bool = False):
             (student_records[2], problem_records[1], "좋아요. 더 구체적으로 명확하게 확인해보세요.", ["너무 일반적인 피드백인지 확인", "구체 액션 추가"]),
             (student_records[6], problem_records[6], "정답을 대신 완성하기보다 역할, 경계, 검증 조건을 스스로 채워보세요.", ["정답 대체 표현 점검", "검증 조건 확인"]),
         ]
+        review_log_records: list[tuple[PromiCoachLog, User, Problem, str]] = []
         for r_idx, (student, prob, message, checkpoints) in enumerate(review_samples):
-            db.add(PromiCoachLog(
+            review_log = PromiCoachLog(
                 id=_uid(),
                 student_id=student.id,
                 problem_id=prob.id,
@@ -1199,7 +1200,9 @@ async def seed(reset: bool = False):
                 checkpoints_json=json.dumps(checkpoints, ensure_ascii=False),
                 caution="관리자 리뷰 큐 샘플: 코칭 품질 확인 필요",
                 created_at=_now(r_idx + 1, r_idx),
-            ))
+            )
+            db.add(review_log)
+            review_log_records.append((review_log, student, prob, message))
             coach_count += 1
         print(f"   ✅ 프롬이 코칭 로그 {coach_count}건 생성")
 
@@ -1260,6 +1263,54 @@ async def seed(reset: bool = False):
                     created_at=_now(a_idx + 1),
                 )
                 db.add(log)
+                log_count += 1
+
+        # 프롬이 규칙 개선 큐 샘플: 대기/보류/반영 완료 상태를 모두 확인할 수 있게 생성
+        print("   🐶 프롬이 규칙 개선 요청 샘플 생성 중...")
+        rule_update_samples = [
+            ("pending", "정답을 직접 제공한 듯한 표현이라 소크라테스식 질문으로 바꿔야 합니다.", None),
+            ("held", "일반적인 피드백이지만 즉시 규칙 변경보다는 유사 사례를 더 모읍니다.", "동일한 일반 피드백이 3회 이상 반복될 때 규칙으로 승격 검토"),
+            ("reflected", "보안 경계 안내는 유지하되 학생이 직접 채울 체크리스트를 먼저 묻게 반영했습니다.", "보안/인젝션 문제에서는 정답 예시보다 역할 경계, 민감정보, 거부 정책 체크리스트를 질문형으로 먼저 제시한다."),
+        ]
+        for idx, (status, note, rule_patch) in enumerate(rule_update_samples):
+            review_log, student, prob, message = review_log_records[idx % len(review_log_records)]
+            rule_update_id = _uid()
+            db.add(ActivityLog(
+                id=rule_update_id,
+                user_id=admin_records[idx % len(admin_records)].id,
+                role="admin",
+                action="promi_rule_update_needed",
+                target_type="promi_coach_log",
+                target_id=review_log.id,
+                message="프롬이 코칭 규칙 개선 필요 항목이 등록되었습니다.",
+                metadata_json=json.dumps({
+                    "log_id": review_log.id,
+                    "student_id": student.id,
+                    "problem_id": prob.id,
+                    "message": message,
+                    "caution": review_log.caution,
+                    "note": note,
+                }, ensure_ascii=False),
+                created_at=_now(idx + 1),
+            ))
+            log_count += 1
+            if status != "pending":
+                db.add(ActivityLog(
+                    id=_uid(),
+                    user_id=admin_records[idx % len(admin_records)].id,
+                    role="admin",
+                    action="promi_rule_update_resolved",
+                    target_type="promi_rule_update",
+                    target_id=rule_update_id,
+                    message="프롬이 규칙 개선 항목이 처리되었습니다.",
+                    metadata_json=json.dumps({
+                        "status": status,
+                        "note": note,
+                        "rule_patch": rule_patch,
+                        "promi_log_id": review_log.id,
+                    }, ensure_ascii=False),
+                    created_at=_now(idx),
+                ))
                 log_count += 1
         print(f"   ✅ 활동 로그 {log_count}건 생성")
 

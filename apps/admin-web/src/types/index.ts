@@ -346,3 +346,33 @@ export interface PromiReviewQueueItem {
 export interface PromiReviewQueueResponse {
   items: PromiReviewQueueItem[];
 }
+
+export interface PromiReviewActionResponse {
+  ok: boolean;
+  status: string;
+  intervention_id?: string | null;
+  rule_update_id?: string | null;
+  action: string;
+}
+
+export interface PromiRuleUpdateItem {
+  id: string;
+  promi_log_id?: string | null;
+  student_id?: string | null;
+  username: string;
+  problem_id?: string | null;
+  problem_title: string;
+  original_message: string;
+  caution?: string | null;
+  review_note?: string | null;
+  admin_message: string;
+  status: 'pending' | 'reflected' | 'held';
+  resolved_note?: string | null;
+  rule_patch?: string | null;
+  resolved_at?: string | null;
+  created_at: string;
+}
+
+export interface PromiRuleUpdateQueueResponse {
+  items: PromiRuleUpdateItem[];
+}

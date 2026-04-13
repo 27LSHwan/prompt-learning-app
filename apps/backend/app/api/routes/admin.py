@@ -48,6 +48,10 @@ from ...schemas.admin import (
     PromiReviewActionResponse,
     PromiReviewQueueItem,
     PromiReviewQueueResponse,
+    PromiRuleUpdateItem,
+    PromiRuleUpdateQueueResponse,
+    PromiRuleUpdateResolve,
+    PromiRuleUpdateResolveResponse,
     RecommendationEffectItem,
     RecommendationEffectResponse,
     RecentHighRiskItem,
@@ -1268,6 +1272,7 @@ async def review_promi_feedback(
         raise HTTPException(status_code=404, detail="프롬이 로그를 찾을 수 없습니다.")
     problem = (await db.execute(select(Problem).where(Problem.id == log.problem_id))).scalar_one_or_none()
     intervention_id: str | None = None
+    rule_update_id: str | None = None
     follow_up_action = "review_recorded"
 
     if data.status == "follow_up_student":
@@ -1290,7 +1295,7 @@ async def review_promi_feedback(
         intervention_id = str(intervention.id)
         follow_up_action = "student_intervention_created"
     elif data.status == "needs_prompt_update":
-        db.add(ActivityLog(
+        rule_update = ActivityLog(
             user_id=str(admin.id),
             role="admin",
             action="promi_rule_update_needed",
@@ -1305,7 +1310,10 @@ async def review_promi_feedback(
                 "caution": log.caution,
                 "note": data.note,
             }, ensure_ascii=False),
-        ))
+        )
+        db.add(rule_update)
+        await db.flush()
+        rule_update_id = str(rule_update.id)
         follow_up_action = "rule_update_logged"
 
     db.add(ActivityLog(
@@ -1319,11 +1327,122 @@ async def review_promi_feedback(
             "status": data.status,
             "note": data.note,
             "intervention_id": intervention_id,
+            "rule_update_id": rule_update_id,
             "follow_up_action": follow_up_action,
         }, ensure_ascii=False),
     ))
     await db.commit()
-    return PromiReviewActionResponse(ok=True, status=data.status, intervention_id=intervention_id, action=follow_up_action)
+    return PromiReviewActionResponse(ok=True, status=data.status, intervention_id=intervention_id, rule_update_id=rule_update_id, action=follow_up_action)
+
+
+@router.get("/promi-rule-updates", response_model=PromiRuleUpdateQueueResponse)
+async def get_promi_rule_updates(
+    status: str = Query("pending", pattern="^(pending|reflected|held|all)$"),
+    limit: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    resolved_logs = (await db.execute(
+        select(ActivityLog)
+        .where(ActivityLog.action == "promi_rule_update_resolved")
+        .where(ActivityLog.target_id.is_not(None))
+        .order_by(desc(ActivityLog.created_at))
+    )).scalars().all()
+    resolved_by_item_id: dict[str, ActivityLog] = {}
+    for resolved_log in resolved_logs:
+        resolved_by_item_id.setdefault(str(resolved_log.target_id), resolved_log)
+
+    logs = (await db.execute(
+        select(ActivityLog)
+        .where(ActivityLog.action == "promi_rule_update_needed")
+        .order_by(desc(ActivityLog.created_at))
+        .limit(limit * 2)
+    )).scalars().all()
+
+    items: list[PromiRuleUpdateItem] = []
+    for log in logs:
+        resolved_log = resolved_by_item_id.get(str(log.id))
+        resolved_metadata: dict = {}
+        resolved_status = "pending"
+        if resolved_log and resolved_log.metadata_json:
+            try:
+                resolved_metadata = json.loads(resolved_log.metadata_json)
+            except json.JSONDecodeError:
+                resolved_metadata = {}
+            resolved_status = str(resolved_metadata.get("status") or "reflected")
+
+        if status != "all" and status != resolved_status:
+            continue
+        metadata: dict = {}
+        if log.metadata_json:
+            try:
+                metadata = json.loads(log.metadata_json)
+            except json.JSONDecodeError:
+                metadata = {}
+
+        student_id = metadata.get("student_id")
+        problem_id = metadata.get("problem_id")
+        student = None
+        problem = None
+        if student_id:
+            student = (await db.execute(select(User).where(User.id == student_id))).scalar_one_or_none()
+        if problem_id:
+            problem = (await db.execute(select(Problem).where(Problem.id == problem_id))).scalar_one_or_none()
+
+        items.append(PromiRuleUpdateItem(
+            id=str(log.id),
+            promi_log_id=str(log.target_id) if log.target_id else metadata.get("log_id"),
+            student_id=str(student_id) if student_id else None,
+            username=student.username if student else "알 수 없음",
+            problem_id=str(problem_id) if problem_id else None,
+            problem_title=problem.title if problem else "알 수 없는 문제",
+            original_message=str(metadata.get("message") or ""),
+            caution=metadata.get("caution"),
+            review_note=metadata.get("note"),
+            admin_message=log.message,
+            status=resolved_status,
+            resolved_note=resolved_metadata.get("note"),
+            rule_patch=resolved_metadata.get("rule_patch"),
+            resolved_at=resolved_log.created_at if resolved_log else None,
+            created_at=log.created_at,
+        ))
+        if len(items) >= limit:
+            break
+
+    return PromiRuleUpdateQueueResponse(items=items)
+
+
+@router.post("/promi-rule-updates/{item_id}/resolve", response_model=PromiRuleUpdateResolveResponse)
+async def resolve_promi_rule_update(
+    item_id: str,
+    data: PromiRuleUpdateResolve,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+):
+    rule_update = (await db.execute(
+        select(ActivityLog)
+        .where(ActivityLog.id == item_id)
+        .where(ActivityLog.action == "promi_rule_update_needed")
+    )).scalar_one_or_none()
+    if not rule_update:
+        raise HTTPException(status_code=404, detail="프롬이 규칙 개선 항목을 찾을 수 없습니다.")
+
+    db.add(ActivityLog(
+        user_id=str(admin.id),
+        role="admin",
+        action="promi_rule_update_resolved",
+        target_type="promi_rule_update",
+        target_id=item_id,
+        message="프롬이 규칙 개선 항목이 처리되었습니다.",
+        metadata_json=json.dumps({
+            "status": data.status,
+            "note": data.note,
+            "rule_patch": data.rule_patch,
+            "promi_log_id": rule_update.target_id,
+        }, ensure_ascii=False),
+    ))
+    await db.commit()
+    return PromiRuleUpdateResolveResponse(ok=True, status=data.status)
 
 
 @router.get("/students/{student_id}/intervention-recommendations", response_model=list[InterventionSuggestionItem])
